@@ -45,9 +45,7 @@
 #include "crypto/error.hpp"
 #include "perfmon/types.hpp"
 
-/* linux_tcp_conn_t provides a disgusting wrapper around a TCP network connection. */
-
-class linux_tcp_conn_t :
+class tcp_conn_t :
     public home_thread_mixin_t,
     private linux_event_callback_t {
 public:
@@ -57,9 +55,8 @@ public:
 
     class connect_failed_exc_t : public std::exception {
     public:
-        explicit connect_failed_exc_t(int en) :
-            error(en),
-            info("Could not make connection: " + errno_string(error)) { }
+        explicit connect_failed_exc_t(const std::string& descr) :
+            info("Could not make connection: " + descr) { }
 
         const char *what() const throw () {
             return info.c_str();
@@ -67,17 +64,22 @@ public:
 
         ~connect_failed_exc_t() throw () { }
 
-        const int error;
         const std::string info;
     };
 
     // NB. interruptor cannot be nullptr.
-    linux_tcp_conn_t(
+    tcp_conn_t(
         const ip_address_t &host,
         int port,
         signal_t *interruptor,
         int local_port = ANY_PORT)
         THROWS_ONLY(connect_failed_exc_t, interrupted_exc_t);
+}
+
+class buffered_conn_t :
+    public home_thread_mixin_t,
+    private linux_event_callback_t {
+public:
 
     /* Reading */
 
@@ -421,7 +423,7 @@ private:
 
 #endif /* ENABLE_TLS */
 
-class linux_tcp_conn_descriptor_t {
+class linux_tcp_conn_descriptor_t { // ATN no linux_
 public:
     ~linux_tcp_conn_descriptor_t();
 
