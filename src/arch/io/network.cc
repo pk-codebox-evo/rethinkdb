@@ -203,6 +203,19 @@ fd_t create_socket_wrapper(int address_family) {
     return res;
 }
 
+buffered_conn_t::buffered_conn_t(std::unique_ptr<conn_t> &&conn) :
+    base_conn(std::move(conn)),
+    read_in_progress(false),
+    write_in_progress(false),
+    read_buffer(IO_BUFFER_SIZE),
+    write_handler(this),
+    write_queue_limiter(WRITE_QUEUE_MAX_SIZE),
+    write_coro_pool(1, &write_queue, &write_handler),
+    current_write_buffer(get_write_buffer()),
+    drainer(new auto_drainer_t){
+
+}
+
 // Network connection object
 linux_tcp_conn_t::linux_tcp_conn_t(const ip_address_t &peer,
                                    int port,
@@ -210,14 +223,7 @@ linux_tcp_conn_t::linux_tcp_conn_t(const ip_address_t &peer,
                                    int local_port) THROWS_ONLY(connect_failed_exc_t, interrupted_exc_t) :
         write_perfmon(nullptr),
         sock(create_socket_wrapper(peer.get_address_family())),
-        event_watcher(new event_watcher_t(sock.get(), this)),
-        read_in_progress(false), write_in_progress(false),
-        read_buffer(IO_BUFFER_SIZE),
-        write_handler(this),
-        write_queue_limiter(WRITE_QUEUE_MAX_SIZE),
-        write_coro_pool(1, &write_queue, &write_handler),
-        current_write_buffer(get_write_buffer()),
-        drainer(new auto_drainer_t) {
+        event_watcher(new event_watcher_t(sock.get(), this)) {
 
 #ifndef _WIN32
     guarantee_err(fcntl(sock.get(), F_SETFL, O_NONBLOCK) == 0, "Could not make socket non-blocking");
@@ -247,14 +253,7 @@ linux_tcp_conn_t::linux_tcp_conn_t(const ip_address_t &peer,
 linux_tcp_conn_t::linux_tcp_conn_t(fd_t s) :
        write_perfmon(NULL),
        sock(s),
-       event_watcher(new event_watcher_t(sock.get(), this)),
-       read_in_progress(false), write_in_progress(false),
-       read_buffer(IO_BUFFER_SIZE),
-       write_handler(this),
-       write_queue_limiter(WRITE_QUEUE_MAX_SIZE),
-       write_coro_pool(1, &write_queue, &write_handler),
-       current_write_buffer(get_write_buffer()),
-       drainer(new auto_drainer_t) {
+       event_watcher(new event_watcher_t(sock.get(), this)) {
     rassert(sock.get() != INVALID_FD);
 
 #ifndef _WIN32

@@ -51,7 +51,7 @@ public:
     virtual MUST_USE int64_t write(const void *p, int64_t n);
 private:
     tcp_conn_stream_t *inner_;
-};
+};a
 
 class keepalive_tcp_conn_stream_t : public tcp_conn_stream_t {
 public:
