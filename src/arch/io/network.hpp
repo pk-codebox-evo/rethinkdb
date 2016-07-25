@@ -47,6 +47,7 @@
 
 class conn_t {
 public:
+    conn_t() : write_perfmon(nullptr) { }
 
     class connect_failed_exc_t : public std::exception {
     public:
@@ -71,6 +72,8 @@ public:
 
     virtual ~conn_t() { }
 
+    virtual void rethread(threadnum_t new_thread);
+
 protected:
     /* Put a `perfmon_rate_monitor_t` here if you want to record stats on how fast data is being
     transmitted over the network. */
@@ -94,20 +97,34 @@ public:
         int local_port = ANY_PORT)
         THROWS_ONLY(connect_failed_exc_t, interrupted_exc_t);
 
-protected:
+    /* Call shutdown_write() to close the half of the pipe that goes from us to the peer */
+    void shutdown_write();
 
-    void on_shutdown_read();
-    void on_shutdown_write();
+    /* Returns false if the half of the pipe that goes from us to the peer has been closed. */
+    bool is_write_open() const;
 
+    void shutdown_read();
+
+    /* Returns false if the half of the pipe that goes from the peer to us has been closed. */
+    bool is_read_open() const;
+
+    void rethread(threadnum_t thread);
+
+private:
     // Used by tcp_listener_t and any derived classes.
     explicit linux_tcp_conn_t(fd_t sock);
+
+    friend class linux_secure_tcp_conn_t;
 
     // The underlying TCP socket file descriptor.
     scoped_fd_t sock;
 
     /* These are pulsed if and only if the read/write end of the connection has been closed. */
     cond_t read_closed, write_closed;
-private:
+
+    void on_shutdown_read();
+    void on_shutdown_write();
+
     /* Note that this only gets called to handle error-events. Read and write
     events are handled through the event_watcher_t. */
     void on_event(int events);
@@ -128,6 +145,10 @@ private:
     /* Used to actually perform a write. If the write end of the connection is open, then
     writes `size` bytes from `buffer` to the socket. */
     void perform_write(const void *buffer, size_t size);
+
+    bool getpeername(ip_and_port_t *ip_and_port);
+
+    event_watcher_t *get_event_watcher();
 };
 
 class buffered_conn_t :
@@ -178,12 +199,12 @@ public:
 
     void read_more_buffered(signal_t *closer) THROWS_ONLY(tcp_conn_read_closed_exc_t);
 
+    /* Returns false if the half of the pipe that goes from the peer to us has been closed. */
+    bool is_read_open() const;
+
     /* Call shutdown_read() to close the half of the pipe that goes from the peer to us. If there
     is an outstanding read() or peek_until() operation, it will throw tcp_conn_read_closed_exc_t. */
     void shutdown_read();
-
-    /* Returns false if the half of the pipe that goes from the peer to us has been closed. */
-    bool is_read_open() const;
 
     /* Writing */
 
@@ -220,10 +241,6 @@ public:
     ~buffered_conn_t() THROWS_NOTHING;
 
     void rethread(threadnum_t thread);
-
-    bool getpeername(ip_and_port_t *ip_and_port);
-
-    event_watcher_t *get_event_watcher();
 
 private:
 
@@ -328,8 +345,8 @@ private:
     deleting_intrusive_list_t<write_buffer_t> unused_write_buffers;
     deleting_intrusive_list_t<write_queue_op_t> unused_write_queue_ops;
 
-    write_buffer_t * get_write_buffer();
-    write_queue_op_t * get_write_queue_op();
+    write_buffer_t *get_write_buffer();
+    write_queue_op_t *get_write_queue_op();
     void release_write_buffer(write_buffer_t *buffer);
     void release_write_queue_op(write_queue_op_t *op);
 
@@ -376,7 +393,8 @@ private:
     DISABLE_COPYING(tls_conn_wrapper_t);
 };
 
-class linux_secure_tcp_conn_t : public conn_t {
+class linux_secure_tcp_conn_t :
+    public conn_t {
 public:
 
     friend class linux_tcp_conn_descriptor_t;
@@ -423,9 +441,9 @@ private:
 
     bool is_open() { return !closed.is_pulsed(); }
 
-    tls_conn_wrapper_t conn;
+    linux_tcp_conn_t transport;
 
-    linux_tcp_conn_t underlying_conn;
+    tls_conn_wrapper_t conn;
 
     cond_t closed;
 };
