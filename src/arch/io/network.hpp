@@ -157,6 +157,11 @@ public:
 
     buffered_conn_t(scoped_ptr_t<conn_t> conn);
 
+    scoped_ptr_t<cond_t> rdhup_watcher();
+    // ATN TODO
+    // linux_event_watcher_t *ew = conn->get_event_watcher();
+    // linux_event_watcher_t::watch_t conn_interrupted(ew, poll_event_rdhup);
+
     /* Reading */
 
     /* If you know beforehand how many bytes you want to read, use read() with a
@@ -450,6 +455,7 @@ private:
 
 #endif /* ENABLE_TLS */
 
+// ATN is this class needed?
 class linux_tcp_conn_descriptor_t {
 public:
     ~linux_tcp_conn_descriptor_t();

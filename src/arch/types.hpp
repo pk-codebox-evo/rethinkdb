@@ -49,12 +49,14 @@ private:
     std::string info;
 };
 
+// ATN no tcp_
 class tcp_conn_read_closed_exc_t : public std::exception {
     const char *what() const throw () {
         return "Network connection read end closed";
     }
 };
 
+// ATN no tcp_
 struct tcp_conn_write_closed_exc_t : public std::exception {
     const char *what() const throw () {
         return "Network connection write end closed";

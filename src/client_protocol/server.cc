@@ -560,13 +560,8 @@ void query_server_t::connection_loop(buffered_conn_t *conn,
     new_mutex_t send_mutex;
     scoped_perfmon_counter_t connection_counter(&rdb_ctx->stats.client_connections);
 
-#ifdef __linux
-    linux_event_watcher_t *ew = conn->get_event_watcher();
-    linux_event_watcher_t::watch_t conn_interrupted(ew, poll_event_rdhup);
-    wait_any_t interruptor(drain_signal, &abort, &conn_interrupted);
-#else
-    wait_any_t interruptor(drain_signal, &abort);
-#endif  // __linux
+    scoped_ptr_t<cond_t> conn_interrupted = conn->rdhup_watcher();
+    wait_any_t interruptor(drain_signal, &abort, &*conn_interrupted);
 
     new_semaphore_t sem(max_concurrent_queries);
     auto_drainer_t coro_drainer;
