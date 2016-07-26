@@ -17,7 +17,7 @@ public:
         signal_t *interruptor, int local_port = 0);
 
     // Takes ownership.
-    explicit tcp_conn_stream_t(tcp_conn_t *conn);
+    explicit tcp_conn_stream_t(buffered_conn_t *conn);
     virtual ~tcp_conn_stream_t();
 
     virtual MUST_USE int64_t read(void *p, int64_t n);
@@ -34,12 +34,12 @@ public:
     bool is_read_open();
     bool is_write_open();
 
-    tcp_conn_t *get_underlying_conn() {
+    buffered_conn_t *get_underlying_conn() {
         return conn_;
     }
 
 private:
-    tcp_conn_t *conn_;
+    buffered_conn_t *conn_;
 
     DISABLE_COPYING(tcp_conn_stream_t);
 };
@@ -51,7 +51,7 @@ public:
     virtual MUST_USE int64_t write(const void *p, int64_t n);
 private:
     tcp_conn_stream_t *inner_;
-};a
+};
 
 class keepalive_tcp_conn_stream_t : public tcp_conn_stream_t {
 public:

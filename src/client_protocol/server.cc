@@ -214,7 +214,7 @@ int query_server_t::get_port() const {
     return tcp_listener->get_port();
 }
 
-void write_datum(tcp_conn_t *connection, ql::datum_t datum, signal_t *interruptor) {
+void write_datum(buffered_conn_t *connection, ql::datum_t datum, signal_t *interruptor) {
     rapidjson::StringBuffer buffer;
     rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
     datum.write_json(&writer);
@@ -222,7 +222,7 @@ void write_datum(tcp_conn_t *connection, ql::datum_t datum, signal_t *interrupto
     connection->write(buffer.GetString(), buffer.GetSize(), interruptor);
 }
 
-ql::datum_t read_datum(tcp_conn_t *connection, signal_t *interruptor) {
+ql::datum_t read_datum(buffered_conn_t *connection, signal_t *interruptor) {
     std::array<char, 2048> buffer;
 
     std::size_t offset = 0;
@@ -257,7 +257,7 @@ void query_server_t::handle_conn(const scoped_ptr_t<tcp_conn_descriptor_t> &ncon
     cross_thread_signal_t ct_keepalive(keepalive.get_drain_signal(), chosen_thread);
     on_thread_t rethreader(chosen_thread);
 
-    scoped_ptr_t<tcp_conn_t> conn;
+    scoped_ptr_t<buffered_conn_t> conn;
 
     try {
         nconn->make_server_connection(tls_ctx, &conn, &ct_keepalive);
@@ -508,7 +508,7 @@ void query_server_t::handle_conn(const scoped_ptr_t<tcp_conn_descriptor_t> &ncon
 }
 
 void query_server_t::make_error_response(bool is_draining,
-                                         const tcp_conn_t &conn,
+                                         const buffered_conn_t &conn,
                                          const std::string &err_str,
                                          ql::response_t *response_out) {
     // Best guess at the error that occurred.
@@ -550,7 +550,7 @@ void save_exception(std::exception_ptr *err,
 }
 
 template <class protocol_t>
-void query_server_t::connection_loop(tcp_conn_t *conn,
+void query_server_t::connection_loop(buffered_conn_t *conn,
                                      size_t max_concurrent_queries,
                                      ql::query_cache_t *query_cache,
                                      signal_t *drain_signal) {

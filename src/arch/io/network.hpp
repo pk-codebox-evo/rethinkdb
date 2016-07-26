@@ -110,9 +110,10 @@ public:
 
     void rethread(threadnum_t thread);
 
-private:
-    // Used by tcp_listener_t and any derived classes.
+    // ATN outdated comment: Used by tcp_listener_t and any derived classes.
     explicit linux_tcp_conn_t(fd_t sock);
+
+private:
 
     friend class linux_secure_tcp_conn_t;
 
@@ -151,12 +152,10 @@ private:
     event_watcher_t *get_event_watcher();
 };
 
-class buffered_conn_t :
-    public home_thread_mixin_t,
-    private linux_event_callback_t {
+class buffered_conn_t : public home_thread_mixin_t {
 public:
 
-    buffered_conn_t(std::unique_ptr<conn_t>&& conn);
+    buffered_conn_t(scoped_ptr_t<conn_t> conn);
 
     /* Reading */
 
@@ -242,6 +241,9 @@ public:
 
     void rethread(threadnum_t thread);
 
+    bool getpeername(ip_and_port_t *ip_and_port);
+    void enable_keepalive();
+
 private:
 
     /* `read_op_wrapper_t` and `write_op_wrapper_t` are an attempt to factor out
@@ -307,7 +309,7 @@ private:
         buffered_conn_t *parent;
     };
 
-    std::unique_ptr<conn_t> base_conn;
+    scoped_ptr_t<conn_t> base_conn;
 
     /* True if there is a pending read or write */
     bool read_in_progress, write_in_progress;
@@ -397,8 +399,6 @@ class linux_secure_tcp_conn_t :
     public conn_t {
 public:
 
-    friend class linux_tcp_conn_descriptor_t;
-
     // Client connection constructor.
     linux_secure_tcp_conn_t(
         SSL_CTX *tls_ctx, const ip_address_t &host, int port,
@@ -416,12 +416,12 @@ public:
 
     void rethread(threadnum_t thread);
 
-private:
-
     // Server connection constructor.
     linux_secure_tcp_conn_t(
         SSL_CTX *tls_ctx, fd_t _sock, signal_t *interruptor
     ) THROWS_ONLY(crypto::openssl_error_t, interrupted_exc_t);
+
+private:
 
     void perform_handshake(signal_t *interruptor) THROWS_ONLY(
         crypto::openssl_error_t, interrupted_exc_t);
@@ -450,18 +450,18 @@ private:
 
 #endif /* ENABLE_TLS */
 
-class linux_tcp_conn_descriptor_t { // ATN no linux_
+class linux_tcp_conn_descriptor_t {
 public:
     ~linux_tcp_conn_descriptor_t();
 
     void make_server_connection(
-        tls_ctx_t *tls_ctx, scoped_ptr_t<linux_tcp_conn_t> *tcp_conn, signal_t *closer)
+        tls_ctx_t *tls_ctx, scoped_ptr_t<buffered_conn_t> *tcp_conn, signal_t *closer)
         THROWS_ONLY(crypto::openssl_error_t, interrupted_exc_t);
 
     // Must get called exactly once during lifetime of this object.
     // Call it on the thread you'll use the server connection on.
     void make_server_connection(
-        tls_ctx_t *tls_ctx, linux_tcp_conn_t **tcp_conn_out, signal_t *closer)
+        tls_ctx_t *tls_ctx, buffered_conn_t **tcp_conn_out, signal_t *closer)
         THROWS_ONLY(crypto::openssl_error_t, interrupted_exc_t);
 
 private:
